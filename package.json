@@ -1,0 +1,35 @@
+{
+	"name": "recirculate",
+	"version": "0.1.1",
+	"description": "Air conditioning for dynamic webapps.",
+	"main": "src/index.js",
+	"repository": "https://gitlab.com/robbiewxyz/recirculate",
+	"homepage": "https://recirculate.robbiew.xyz",
+	"author": "Robbiewxyz <hi@robbiew.xyz>",
+	"license": "MIT",
+	"funding": {},
+	"scripts": {
+		"test": "jest",
+		"watch": "jest --watch",
+		"release": "",
+		"docs": ""
+	},
+	"jest": {
+		"testRegex": "test/.+\\.js$"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@babel/core": "^7.10.3",
+		"@babel/preset-env": "^7.10.4",
+		"jest": "^26.1.0"
+	},
+	"keywords": [
+		"recirculate",
+		"reactive",
+		"frp",
+		"state",
+		"functional-reactive-programming",
+		"state management",
+		"data flow"
+	]
+}
