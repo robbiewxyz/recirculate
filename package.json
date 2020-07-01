@@ -1,7 +1,7 @@
 {
 	"name": "recirculate",
 	"version": "0.1.1",
-	"description": "Air conditioning for dynamic webapps.",
+	"description": "Air conditioning system for dynamic webapps.",
 	"main": "src/index.js",
 	"repository": "https://gitlab.com/robbiewxyz/recirculate",
 	"homepage": "https://recirculate.robbiew.xyz",
@@ -28,7 +28,7 @@
 		"reactive",
 		"frp",
 		"state",
-		"functional-reactive-programming",
+		"functional reactive programming",
 		"state management",
 		"data flow"
 	]
