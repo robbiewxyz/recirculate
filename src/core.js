@@ -1,4 +1,5 @@
 const stack = []
+let clock = 0
 const unobservations = new Set ()
 
 class Source {
@@ -9,9 +10,11 @@ class Source {
 		this.upstreams = new Set ()
 		this.downstreams = new Set ()
 		this.disposed = true
+		this.updated = clock
 		this.put = this.put.bind (this)
 	}
 	recalculate () {
+		if (!this.disposed) this.ret && this.ret ()
 		try {
 			this.upstreams.forEach (up => unobservations.add (up))
 			this.disposed = false
@@ -36,8 +39,8 @@ class Source {
 			this.upstreams.delete (up)
 			if (up.downstreams.size === 0 && !up.disposed) up.dispose ()
 		})
-		this.ret && this.ret ()
 		this.disposed = true
+		this.ret && this.ret ()
 	}
 	pull () {
 		if (stack.length === 0) throw new Error (`don't pull outside a source`)
@@ -58,7 +61,14 @@ class Source {
 		if (stack.indexOf (this) > -1) return
 		const propagation = this.queue ()
 		//console.log (`about to propagate`, next, [ ...propagation ])
-		propagation.forEach (s => s !== this && s.recalculate ())
+		this.updated = ++clock
+		propagation.forEach (s => {
+			if (s === this) return
+			if (![ ...s.upstreams ].find (up => up.updated === clock)) return
+			const prev = s.value
+			s.recalculate ()
+			if (s.value !== prev) s.updated = clock
+		})
 	}
 	queue (list = []) {
 		if (list.indexOf (this) > -1) return
@@ -70,31 +80,21 @@ class Source {
 
 export const source = track => new Source (track)
 
-export const sink = source => source.pull ()
+export const isSource = source => source instanceof Source
+
+export const sink = source => isSource (source) ? source.pull () : source
 
 export const recirculate = track => {
 	let recirculator = null
 	let disposed = false
 	const up = source (put => (recirculator = put, () => recirculator = null))
-	up.name = `UP`
 	const result = track (up)
-	result.name = `RESULT`
+	if (!(result instanceof Source)) throw new Error (`only return a source in recirculate not ${source}`)
 	const down = source (put => {
-		if (disposed) return
 		const value = sink (result)
-		//console.log (`about to put`, value, !!recirculator, stack)
+		//console.log (`about to recirculate`, value, stack)
 		recirculator && recirculator (value)
 	})
-	down.name = `DOWN`
 	down.recalculate ()
 	return () => down.dispose ()
 }
-
-/*
-SOURCE LIFECYCLE:
-* first sink -> (unqueue dispose -or- track -> maybe put) -> return
-* other puts -> force sinking
-* other sinks -> return
-* last sink -> queue dispose
-* end of stack -> unobserve
-*/

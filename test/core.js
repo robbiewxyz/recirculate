@@ -84,3 +84,30 @@ test (`async changes should propagate and dispose`, () => {
 	dispose ()
 	expect (log).toEqual ([ `on primary`, `on secondary`, `off primary`, `off secondary` ])
 })
+
+test (`downstream substitution should be contigious`, () => {
+	const log = []
+	const primary = source (put => (log.push (`on primary`), () => log.push (`off primary`)))
+	const one = source (() => sink (primary))
+	const two = source (() => sink (primary))
+	const dispose = recirculate (input => source (put => {
+		if (!sink (input)) sink (one), put (true)
+		else sink (two)
+	}))
+	expect (log).toEqual ([ `on primary` ])
+	dispose ()
+})
+
+test (`nested sources should cache`, () => {
+	const log = []
+	let _put
+	const primary = source (put => (_put = put, null))
+	const three = source (put => {
+		const n = sink (source (() => sink (primary) - (sink (primary) % 3)))
+		log.push (`three ${n}`)
+	})
+	const dispose = recirculate (() => three)
+	for (let i = 0; i < 10; i++) _put (i)
+	expect (log).toEqual ([ `three 0`, `three 3`, `three 6`, `three 9` ])
+	dispose ()
+})
