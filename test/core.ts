@@ -11,13 +11,10 @@ test (`initial put should propagate once`, () => {
 
 test (`propagate should recirculate`, () => {
 	const log: Array<any> = []
-	const dispose = recirculate ((input: Source<number>) => source ((put: Put<number>) => {
-		try {
-			log.push (sink (input))
-			if (sink (input) < 5) put ((sink (input) || 0) + 1)
-		} catch (e) {
-			put (0)
-		}
+	const dispose = recirculate<number> (input => source (put => {
+		const value = sink (input, 0)
+		log.push (value)
+		if (value < 5) put ((value || 0) + 1)
 	}))
 	expect (log).toEqual ([ 0, 1, 2, 3, 4, 5 ])
 	dispose ()
@@ -52,20 +49,14 @@ test (`changing upstreams should dispose`, () => {
 		return () => log.push (`off two`)
 	})
 	const dispose = recirculate (input => source (() => {
-		let number
-		try {
-			number = sink (input)
-		} catch (e) {
-			number = 0
-		}
-		switch (number) {
+		switch (sink (input, 0)) {
 			case 0: return sink (zero)
 			case 1: return sink (one)
 			case 2: return sink (two)
 			case 3: return 3
 		}
 	}))
-	expect (log).toEqual ([ `on zero`, `on one`, `on two`, `off zero`, `off one`, `off two` ])
+	expect (log).toEqual ([ `on zero`, `on one`, `off zero`, `on two`, `off one`, `off two` ])
 	dispose ()
 })
 
@@ -84,7 +75,7 @@ test (`async changes should propagate and dispose`, () => {
 		return () => log.push (`off secondary`)
 	})
 	const dispose = recirculate (input => source (() => {
-		switch (sink (input)) {
+		switch (sink (input, null)) {
 			case `secondary`: return sink (secondary)
 			default: return sink (primary)
 		}
@@ -100,7 +91,7 @@ test (`downstream substitution should be contigious`, () => {
 	const one = source (() => sink (primary))
 	const two = source (() => sink (primary))
 	const dispose = recirculate (input => source (put => {
-		if (!sink (input)) sink (one), put (true)
+		if (!sink (input, false)) sink (one), put (true)
 		else sink (two)
 	}))
 	expect (log).toEqual ([ `on primary` ])
@@ -108,11 +99,11 @@ test (`downstream substitution should be contigious`, () => {
 })
 
 test (`nested sources should cache`, () => {
-	const log: Array<any> = []
-	let _put: Put<any> | undefined
-	const primary = source ((put: Put<any>) => (_put = put, undefined))
+	const log: Array<string> = []
+	let _put: Put<number> | undefined
+	const primary = source<number> (put => (_put = put, undefined))
 	const three = source (put => {
-		const n = sink (source (() => sink (primary) - (sink (primary) % 3)))
+		const n = sink (source (() => sink (primary, 0) - (sink (primary, 0) % 3)))
 		log.push (`three ${n}`)
 	})
 	const dispose = recirculate (() => three)

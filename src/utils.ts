@@ -1,4 +1,4 @@
-import { Track, State, Source, source, sink } from '.'
+import { Track, Pending, Source, source, sink } from '.'
 
 // yes = stream
 export const yes = source (() => true)
@@ -15,7 +15,7 @@ export const reduce = <I, A> (i: (a: A, i: I) => A) => (a: A) => (s: Source<I>) 
 // map (value => value) (stream) => stream
 export const map = <I, O> (i: (i: I) => O) => (s: Source<I>) => source (() => i (sink (s)))
 // filter (value => boolean) (stream) => stream
-export const filter = <I> (i: (i: I) => boolean) => (s: Source<I>) => source (() => reduce ((a: I | State, v: I) => i (v) ? v : a) (State.PENDING) (s))
+export const filter = <I> (i: (i: I) => boolean) => (s: Source<I>) => source (() => reduce ((a: I | Error, v: I) => i (v) ? v : a) (new Pending ()) (s))
 // and (...streams) => stream
 export const and = <T> (...ss: Array<T | Source<T>>) => source (() => ss.reduce ((a: T | true, s: T | Source<T>) => a && sink (s), true as T | true))
 // or (...streams) => stream

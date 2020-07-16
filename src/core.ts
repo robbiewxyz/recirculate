@@ -1,14 +1,19 @@
-export enum State { PENDING = `PENDING` }
+export class Pending extends Error {}
+const PENDING: unique symbol = Symbol (`PENDING`)
 
 export type Put<T> = (value: T) => void
-type Track1<T> = (put: Put<T>) => Disposer | void
-type Track2<T> = () => T
-export type Track<T> = Track1<T> | Track2<T>
+type AsyncTrack<T> = (put: Put<T>) => Disposer | void
+type SyncTrack<T> = () => T
+export type Track<T> = AsyncTrack<T> | SyncTrack<T>
 export type Disposer = () => void
 export type Loop<T> = (i: Source<T>) => Source<T>
 
-function isTrack1<T> (track: Track<T>): track is Track1<T> {
+function isAsyncTrack<T> (track: Track<T>): track is AsyncTrack<T> {
 	return track.length > 0
+}
+
+export function isSource<T> (source: any): source is Source<T> {
+	return source instanceof Source
 }
 
 let clock: number = 0
@@ -16,21 +21,22 @@ const stack: Array<Source<any>> = []
 const unobservations: Set<Source<any>> = new Set ()
 
 export class Source<T> {
-	protected value: T | State = State.PENDING
+	protected value: T | typeof PENDING = PENDING
 	protected updated: number = clock
 	protected disposer: Disposer | void = undefined
 	protected readonly upstreams: Set<Source<any>> = new Set ()
 	protected readonly downstreams: Set<Source<any>> = new Set ()
 	protected disposed: boolean = true
-	constructor (readonly track: Track<T>) {
-	}
+	protected constructor (
+		protected readonly track: Track<T>
+	) {}
 	protected recalculate () {
 		if (!this.disposed) this.disposer && this.disposer ()
 		this.disposed = false
 		try {
 			this.upstreams.forEach (up => Source.unlink (up, this))
 			stack.push (this)
-			if (isTrack1 (this.track)) {
+			if (isAsyncTrack (this.track)) {
 				const disposer = this.track (this.put)
 				this.disposer = disposer || undefined
 			} else {
@@ -47,13 +53,13 @@ export class Source<T> {
 		this.disposed = true
 		this.disposer && this.disposer ()
 	}
-	pull () {
+	protected pull () {
 		if (stack.length === 0) throw new Error (`don't pull outside a source`)
 		if (stack.indexOf (this) > -1) throw new Error (`don't pull cyclically`)
 		unobservations.delete (this)
 		if (this.disposed) this.recalculate ()
 		Source.link (this, stack [stack.length - 1])
-		if (this.value === State.PENDING) throw State.PENDING
+		if (this.value === PENDING) throw new Pending ()
 		return this.value
 	}
 	protected put = (next: T) => {
@@ -67,7 +73,7 @@ export class Source<T> {
 			queue.forEach (s => s.maybeRecalculate ())
 		}
 	}
-	maybeRecalculate () {
+	protected maybeRecalculate () {
 		let stale = false
 		this.upstreams.forEach (up => stale = stale || up.updated === clock)
 		if (stale) this.recalculate ()
@@ -90,56 +96,64 @@ export class Source<T> {
 		unobservations.forEach (s => s.dispose ())
 		unobservations.clear ()
 	}
+	static source<T> (track: Track<T>) {
+		return new Source (track)
+	}
+	static sink<T> (source: Source<T> | T, pending?: T) {
+		try {
+			return source instanceof Source ? source.pull () : source
+		} catch (e) {
+			if (!(e instanceof Pending)) throw e
+			if (pending === undefined) throw e
+			return pending
+		}
+	}
 }
 
-export function source<T> (track: Track<T>): Source<T> {
-	return new Source (track)
-}
-
-export function isSource<T> (source: any): source is Source<T> {
-	return source instanceof Source
-}
-
-export function sink<T> (source: Source<T> | T): T {
-	return source instanceof Source ? source.pull () : source
-}
+export const source = Source.source
+export const sink = Source.sink
 
 class Recirculator<T> extends Source<T> {
-	protected o: Source<T>
+	protected i: Source<T>
 	protected disposed: boolean = false
-	constructor (loop: Loop<T>) {
+	protected constructor (loop: Loop<T>) {
 		super (() => {})
-		this.o = loop (this)
+		this.i = loop (this)
 		this.recalculate ()
 	}
-	dispose = () => {
+	protected dispose () {
+	}
+	protected stop = () => {
 		super.dispose ()
 		Source.disposeUnobservations ()
 	}
-	recalculate () {
+	protected recalculate () {
 		try {
-			stack.push (this)
-			this.put (this.o.pull ())
-			stack.pop ()
+			stack.splice (0, stack.length, this)
+			const value = Source.sink (this.i)
+			stack.splice (0)
+			this.put (value)
 		} catch (e) {
-			if (e !== State.PENDING) throw e
-			stack.pop ()
+			if (!(e instanceof Pending)) throw e
+		} finally {
+			stack.splice (0)
 		}
 	}
-	pull () {
+	protected pull () {
 		if (stack.length === 0) throw new Error (`don't pull outside a source`)
 		unobservations.delete (this)
 		Source.link (this, stack [stack.length - 1])
-		if (this.value === State.PENDING) throw State.PENDING
+		if (this.value === PENDING) throw new Pending ()
 		return this.value
 	}
 	protected queue (list: Array<Source<any>>) {
 		if (list.indexOf (this) > -1) return
 		list.unshift (this)
 	}
+	static recirculate<T> (loop: Loop<T>): Disposer {
+		const recirculator = new Recirculator (loop)
+		return recirculator.stop
+	}
 }
 
-export function recirculate<T> (loop: Loop<T>): Disposer {
-	const recirculator = new Recirculator (loop)
-	return recirculator.dispose
-}
+export const recirculate = Recirculator.recirculate

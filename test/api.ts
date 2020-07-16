@@ -5,15 +5,15 @@ test (`should expose the correct api`, () => {
 	expect (
 		Object.keys (recirculate).sort ()
 	).toEqual ([
-		`Fragment`,
+		//`Fragment`,
+		`Pending`,
 		`Source`,
-		`State`,
 		`and`,
 		`combine`,
 		`comma`,
 		`expr`,
 		`filter`,
-		`h`,
+		//`h`,
 		`interval`,
 		`isSource`,
 		`map`,
@@ -23,7 +23,7 @@ test (`should expose the correct api`, () => {
 		`raf`,
 		`recirculate`,
 		`reduce`,
-		`render`,
+		//`render`,
 		`sink`,
 		`source`,
 		`yes`,
