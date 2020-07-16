@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"lib": [ "es6", "dom" ],
+		"strict": true,
+		"strictNullChecks": true,
+		"downlevelIteration": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"types": [ "jest" ]
+	},
+	"include": [ "src/**/*.ts", "test/**/*.ts" ]
+}

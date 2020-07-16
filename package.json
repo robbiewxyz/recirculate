@@ -10,18 +10,22 @@
 	"funding": {},
 	"scripts": {
 		"test": "jest",
-		"watch": "jest --watch",
+		"test:watch": "jest --watch",
+		"typecheck": "tsc --noEmit",
+		"typecheck:watch": "tsc --noEmit --watch",
 		"release": "",
 		"docs": ""
 	},
 	"jest": {
-		"testRegex": "test/.+\\.js$"
+		"testRegex": "test/.+\\.ts$"
 	},
 	"dependencies": {},
 	"devDependencies": {
-		"@babel/core": "^7.10.3",
 		"@babel/preset-env": "^7.10.4",
-		"jest": "^26.1.0"
+		"@babel/preset-typescript": "^7.10.4",
+		"@types/jest": "^26.0.4",
+		"jest": "^26.1.0",
+		"typescript": "^3.9.6"
 	},
 	"keywords": [
 		"recirculate",

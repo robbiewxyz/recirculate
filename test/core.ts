@@ -1,26 +1,30 @@
-import { recirculate, source, sink } from '../src'
+import { Put, Source, recirculate, source, sink } from '../src'
 
 test (`initial put should propagate once`, () => {
-	const log = []
-	const initial = source (put => put (`initial`))
-	const logger = source (put => log.push (sink (initial)))
+	const log: Array<any> = []
+	const initial = source (put => { put (`initial`) })
+	const logger = source (put => { put (0), log.push (sink (initial)) })
 	const dispose = recirculate (() => logger)
 	expect (log).toEqual ([ `initial` ])
 	dispose ()
 })
 
 test (`propagate should recirculate`, () => {
-	const log = []
-	const dispose = recirculate (input => source (put => {
-		log.push (sink (input))
-		if (sink (input) < 5) put ((sink (input) || 0) + 1)
+	const log: Array<any> = []
+	const dispose = recirculate ((input: Source<number>) => source ((put: Put<number>) => {
+		try {
+			log.push (sink (input))
+			if (sink (input) < 5) put ((sink (input) || 0) + 1)
+		} catch (e) {
+			put (0)
+		}
 	}))
-	expect (log).toEqual ([ null, 1, 2, 3, 4, 5 ])
+	expect (log).toEqual ([ 0, 1, 2, 3, 4, 5 ])
 	dispose ()
 })
 
 test (`dispose should stop recirculate`, () => {
-	const log = []
+	const log: Array<any> = []
 	const startstop = source (put => {
 		log.push (`start`)
 		return () => log.push (`stop`)
@@ -31,7 +35,7 @@ test (`dispose should stop recirculate`, () => {
 })
 
 test (`changing upstreams should dispose`, () => {
-	const log = []
+	const log: Array<any> = []
 	const zero = source (put => {
 		put (1)
 		log.push (`on zero`)
@@ -48,7 +52,12 @@ test (`changing upstreams should dispose`, () => {
 		return () => log.push (`off two`)
 	})
 	const dispose = recirculate (input => source (() => {
-		const number = sink (input) || 0
+		let number
+		try {
+			number = sink (input)
+		} catch (e) {
+			number = 0
+		}
 		switch (number) {
 			case 0: return sink (zero)
 			case 1: return sink (one)
@@ -61,8 +70,8 @@ test (`changing upstreams should dispose`, () => {
 })
 
 test (`async changes should propagate and dispose`, () => {
-	const log = []
-	let primaryPut
+	const log: Array<any> = []
+	let primaryPut: Put<any> | undefined
 	const primary = source (put => {
 		put (`primary`)
 		primaryPut = put
@@ -80,13 +89,13 @@ test (`async changes should propagate and dispose`, () => {
 			default: return sink (primary)
 		}
 	}))
-	primaryPut (`secondary`)
+	primaryPut && primaryPut (`secondary`)
 	dispose ()
 	expect (log).toEqual ([ `on primary`, `on secondary`, `off primary`, `off secondary` ])
 })
 
 test (`downstream substitution should be contigious`, () => {
-	const log = []
+	const log: Array<any> = []
 	const primary = source (put => (log.push (`on primary`), () => log.push (`off primary`)))
 	const one = source (() => sink (primary))
 	const two = source (() => sink (primary))
@@ -99,15 +108,15 @@ test (`downstream substitution should be contigious`, () => {
 })
 
 test (`nested sources should cache`, () => {
-	const log = []
-	let _put
-	const primary = source (put => (_put = put, null))
+	const log: Array<any> = []
+	let _put: Put<any> | undefined
+	const primary = source ((put: Put<any>) => (_put = put, undefined))
 	const three = source (put => {
 		const n = sink (source (() => sink (primary) - (sink (primary) % 3)))
 		log.push (`three ${n}`)
 	})
 	const dispose = recirculate (() => three)
-	for (let i = 0; i < 10; i++) _put (i)
+	for (let i = 0; i < 10; i++) _put && _put (i)
 	expect (log).toEqual ([ `three 0`, `three 3`, `three 6`, `three 9` ])
 	dispose ()
 })

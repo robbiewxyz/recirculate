@@ -6,6 +6,8 @@ test (`should expose the correct api`, () => {
 		Object.keys (recirculate).sort ()
 	).toEqual ([
 		`Fragment`,
+		`Source`,
+		`State`,
 		`and`,
 		`combine`,
 		`comma`,
